@@ -1,6 +1,6 @@
 # Python Stock Visualizer App
 
-![Stock Visualizer App](link_to_an_image)
+![Stock Visualizer App]
 
 ## Overview
 
@@ -25,10 +25,6 @@ This Python application provides a simple yet powerful tool for visualizing the 
 2. Choose a stock ticker from the dropdown menu.
 3. Specify the start and end dates for the historical data.
 4. Click the "Generate Chart" button to visualize the stock's daily percentage returns.
-
-## Example
-
-![Example Chart](link_to_an_image)
 
 ## Dependencies
 
