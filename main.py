@@ -7,6 +7,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import logging
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
 
 class StockVisualizerApp:
     def __init__(self, root):
@@ -68,6 +71,52 @@ class StockVisualizerApp:
             else:
                 logging.error(f"Erro ao processar {ticker}: {str(e)}")
             return None
+        
+    def calcular_volatilidade(self, dados_acao):
+        # Calcular o desvio padrão dos retornos percentuais
+        volatilidade = dados_acao["Retorno Percentual"].std()
+        return volatilidade
+
+    def destacar_alta_volatilidade(self, dados_acao):
+        volatilidade = self.calcular_volatilidade(dados_acao)
+
+        # Destacar os períodos de alta volatilidade
+        dados_acao["Alta Volatilidade"] = dados_acao["Retorno Percentual"].abs() > 2 * volatilidade
+        return dados_acao
+
+    def treinar_modelo(self, dados_acao):
+        # Calcular o desvio padrão dos retornos percentuais
+        dados_acao["Retorno Percentual"] = dados_acao["Close"].pct_change() * 100
+        dados_acao.dropna(inplace=True)  # Remover valores nulos gerados pelo cálculo percentual
+
+        # Preparar os dados para treinamento do modelo
+        X = np.array(dados_acao.index.values.astype(float)).reshape(-1, 1)
+        y = dados_acao["Close"].values
+
+        # Dividir os dados em conjunto de treinamento e teste
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Inicializar e treinar o modelo de Regressão Linear
+        modelo = LinearRegression()
+        modelo.fit(X_train, y_train)
+
+        # Avaliar o desempenho do modelo
+        score = modelo.score(X_test, y_test)
+        logging.info(f"Desempenho do Modelo: {score:.2f}")
+
+        return modelo
+
+
+    def realizar_previsao(self, modelo, data):
+        # Verificar se o modelo foi treinado com sucesso antes de realizar a previsão
+        if modelo is None:
+            logging.warning("O modelo não foi treinado com sucesso.")
+            return None
+
+        # Converter a data para o formato float antes de realizar a previsão
+        data_float = np.array(data).astype(float)
+        previsto = modelo.predict(data_float)
+        return previsto[0]
 
     def plot_stock_chart(self):
         ticker = self.ticker_var.get()
@@ -81,8 +130,24 @@ class StockVisualizerApp:
         dados_acao = self.obter_dados_acao(ticker, start_date, end_date)
 
         if dados_acao is not None:
+            # Adicionar análise de volatilidade
+            dados_acao = self.destacar_alta_volatilidade(dados_acao)
+
+            # Adicionar o treinamento do modelo
+            modelo = self.treinar_modelo(dados_acao)
+
             self.ax.clear()
             self.ax.plot(dados_acao.index, dados_acao["Retorno Percentual"], label=f"{ticker} - Retorno Percentual")
+
+            # Destacar períodos de alta volatilidade
+            self.ax.fill_between(dados_acao.index, 0, dados_acao["Retorno Percentual"], where=dados_acao["Alta Volatilidade"],
+                                 color='red', alpha=0.3, label='Alta Volatilidade')
+
+            # Adicionar a linha de previsão
+            prev_data = np.array(dados_acao.index)[-1].reshape(-1, 1)
+            prev_price = self.realizar_previsao(modelo, prev_data)
+            self.ax.axhline(y=prev_price, color='green', linestyle='--', linewidth=1, label='Previsão de Preço')
+
             self.ax.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
             self.ax.set_title(f"Variação Percentual Diária - {ticker}")
             self.ax.set_xlabel("Data")
